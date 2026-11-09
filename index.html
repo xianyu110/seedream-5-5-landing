@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Seedream 5.5：像素级可控编辑，百轮修改不崩坏。豆包图像创作模型，支持原生 RGBA、多轮编辑一致性与电影级写实质感。" />
+  <title>Seedream 5.5 · 像素级可控编辑</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --bg-soft: #12151c;
+      --card: #171b24;
+      --text: #f3f5f9;
+      --muted: #9aa3b5;
+      --accent: #5b8cff;
+      --accent-2: #7c5cff;
+      --line: rgba(255,255,255,.08);
+      --ok: #3dd68c;
+      --radius: 20px;
+      --shadow: 0 24px 60px rgba(0,0,0,.45);
+      --max: 1120px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Noto Sans SC", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; height: auto; }
+    .wrap { width: min(100% - 2rem, var(--max)); margin-inline: auto; }
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(16px);
+      background: rgba(11,13,18,.72);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .9rem 0; gap: 1rem;
+    }
+    .brand {
+      display: flex; align-items: center; gap: .65rem; font-weight: 700;
+    }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center; font-size: .85rem; font-weight: 900;
+    }
+    .nav-links { display: flex; gap: 1.1rem; flex-wrap: wrap; color: var(--muted); font-size: .92rem; }
+    .nav-links a:hover { color: var(--text); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      padding: .85rem 1.25rem; border-radius: 999px; font-weight: 700;
+      border: 1px solid transparent; transition: .2s ease; white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white; box-shadow: 0 10px 30px rgba(91,140,255,.35);
+    }
+    .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .btn-ghost {
+      border-color: var(--line); background: rgba(255,255,255,.03); color: var(--text);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.06); }
+    .hero {
+      padding: 4.5rem 0 3rem;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ""; position: absolute; inset: -20% -10% auto;
+      height: 70%; background:
+        radial-gradient(circle at 20% 30%, rgba(91,140,255,.28), transparent 40%),
+        radial-gradient(circle at 80% 10%, rgba(124,92,255,.22), transparent 35%);
+      pointer-events: none;
+    }
+    .hero-grid {
+      display: grid; gap: 2.5rem; align-items: center;
+      grid-template-columns: 1.05fr .95fr; position: relative;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .35rem .75rem; border-radius: 999px;
+      background: rgba(91,140,255,.12); color: #b7ccff;
+      border: 1px solid rgba(91,140,255,.25); font-size: .85rem; font-weight: 500;
+      margin-bottom: 1rem;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(61,214,140,.15); }
+    h1 {
+      font-size: clamp(2rem, 4.5vw, 3.4rem); line-height: 1.15; font-weight: 900;
+      letter-spacing: -.02em; margin-bottom: 1rem;
+    }
+    h1 span {
+      background: linear-gradient(90deg, #fff, #9db7ff 50%, #c3b4ff);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lead { color: var(--muted); font-size: 1.08rem; max-width: 36rem; margin-bottom: 1.6rem; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1.8rem; }
+    .stats {
+      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .8rem;
+    }
+    .stat {
+      background: rgba(255,255,255,.03); border: 1px solid var(--line);
+      border-radius: 16px; padding: .9rem 1rem;
+    }
+    .stat strong { display: block; font-size: 1.25rem; font-weight: 800; }
+    .stat span { color: var(--muted); font-size: .82rem; }
+    .hero-visual {
+      border-radius: 28px; overflow: hidden; border: 1px solid var(--line);
+      box-shadow: var(--shadow); background: var(--card); position: relative;
+    }
+    .hero-visual img { width: 100%; aspect-ratio: 1080/606; object-fit: cover; }
+    .badge {
+      position: absolute; left: 1rem; bottom: 1rem;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+      padding: .45rem .8rem; font-size: .8rem; color: #e8ecf5;
+    }
+    section { padding: 4rem 0; }
+    .section-head {
+      max-width: 40rem; margin-bottom: 2rem;
+    }
+    .section-head h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.25; margin-bottom: .75rem;
+    }
+    .section-head p { color: var(--muted); }
+    .kicker {
+      color: #9db7ff; font-weight: 700; font-size: .9rem; letter-spacing: .04em;
+      text-transform: uppercase; margin-bottom: .55rem;
+    }
+    .feature-banner {
+      border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line);
+      background: #fff; margin-bottom: 1.5rem;
+    }
+    .feature-banner img { width: 100%; }
+    .split {
+      display: grid; gap: 1.5rem; grid-template-columns: 1fr 1fr; align-items: stretch;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      overflow: hidden; box-shadow: var(--shadow);
+    }
+    .card img { width: 100%; }
+    .card-body { padding: 1.25rem 1.35rem 1.5rem; }
+    .card-body h3 { font-size: 1.15rem; margin-bottom: .45rem; }
+    .card-body p { color: var(--muted); font-size: .95rem; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1.2rem 0 0; }
+    .pill {
+      border: 1px solid var(--line); background: rgba(255,255,255,.03);
+      border-radius: 999px; padding: .4rem .8rem; font-size: .82rem; color: #d5dced;
+    }
+    .pricing {
+      display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr);
+      margin-top: 1.5rem;
+    }
+    .price-card {
+      background: linear-gradient(180deg, rgba(91,140,255,.12), rgba(255,255,255,.02));
+      border: 1px solid var(--line); border-radius: 18px; padding: 1.2rem 1.25rem;
+    }
+    .price-card strong { font-size: 1.4rem; display: block; margin: .2rem 0 .35rem; }
+    .price-card span { color: var(--muted); font-size: .88rem; }
+    .compare {
+      display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; margin-top: 1rem;
+    }
+    .compare figure {
+      margin: 0; background: var(--card); border: 1px solid var(--line);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .compare figcaption {
+      padding: .85rem 1rem; color: var(--muted); font-size: .9rem;
+      border-top: 1px solid var(--line);
+    }
+    .cta {
+      margin: 1rem 0 4rem;
+      border-radius: 28px; padding: 2.4rem 1.6rem;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(91,140,255,.35), transparent 35%),
+        radial-gradient(circle at 90% 80%, rgba(124,92,255,.28), transparent 40%),
+        var(--bg-soft);
+      border: 1px solid var(--line); text-align: center;
+    }
+    .cta h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin-bottom: .7rem; }
+    .cta p { color: var(--muted); max-width: 38rem; margin: 0 auto 1.4rem; }
+    .cta-actions { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; }
+    footer {
+      border-top: 1px solid var(--line); padding: 2.5rem 0 3rem; color: var(--muted);
+    }
+    .footer-inner { display: grid; gap: 1.2rem; justify-items: center; text-align: center; }
+    .footer-inner img { max-width: 720px; width: 100%; border-radius: 16px; border: 1px solid var(--line); }
+    .source { font-size: .82rem; opacity: .8; }
+    .source a { color: #9db7ff; text-decoration: underline; }
+    @media (max-width: 900px) {
+      .hero-grid, .split, .compare, .pricing { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .stats { grid-template-columns: 1fr; }
+      .hero { padding-top: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark">S</span>
+        <span>Seedream 5.5</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#edit">多轮编辑</a>
+        <a href="#rgba">RGBA 透明</a>
+        <a href="#realism">写实质感</a>
+        <a href="#vfx">影视融合</a>
+      </nav>
+      <a class="btn btn-primary" href="https://www.volcengine.com/product/ark" target="_blank" rel="noopener">在火山方舟体验</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> 火山引擎 · 豆包图像创作模型</div>
+          <h1>Seedream 5.5<br /><span>像素级可控编辑，百轮修改不崩坏</span></h1>
+          <p class="lead">在像素级可控的基础上，用自然语言完成专业出图、改图、抠图。改该改的，守住不该动的每一个像素；支持原生 RGBA，让创作资产跨场景复用。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://www.volcengine.com/product/ark" target="_blank" rel="noopener">接入火山方舟 API</a>
+            <a class="btn btn-ghost" href="https://jimeng.jianying.com/" target="_blank" rel="noopener">在即梦体验</a>
+            <a class="btn btn-ghost" href="https://www.doubao.com/" target="_blank" rel="noopener">打开豆包</a>
+          </div>
+          <div class="stats">
+            <div class="stat"><strong>百轮</strong><span>连续改图仍保持一致</span></div>
+            <div class="stat"><strong>0.28 元</strong><span>2K 方图编辑单张</span></div>
+            <div class="stat"><strong>快近 40%</strong><span>较 Seedream 5.0 Pro</span></div>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="https://upload.maynor1024.live/file/1794217177276_07.png" alt="Seedream 5.5 影视特效合成示例：火焰与手臂自然融合" />
+          <div class="badge">影视特效合成 · 光影融合更自然</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Why Seedream 5.5</div>
+          <h2>改图比出图更频繁，可控才是生产力</h2>
+          <p>真实生产里，难点在于既要把该改的改对，还要保证不该动的一个像素都不动。Seedream 5.5 支持像素级可控编辑，多轮后仍保持角色、产品、场景细节与资产比例一致；并原生输出 RGBA 透明素材。</p>
+        </div>
+        <div class="pricing">
+          <div class="price-card">
+            <span>计费方式</span>
+            <strong>输入图 + 输出图</strong>
+            <span>文本 Token 免费</span>
+          </div>
+          <div class="price-card">
+            <span>2K 方图编辑</span>
+            <strong>仅 0.28 元 / 张</strong>
+            <span>比 5.0 Pro 便宜 60%</span>
+          </div>
+          <div class="price-card">
+            <span>适用场景</span>
+            <strong>电商 · 广告 · 影视</strong>
+            <span>分镜、游戏资产、知识可视化</span>
+          </div>
+        </div>
+        <div class="pill-row">
+          <span class="pill">电商营销</span>
+          <span class="pill">广告设计</span>
+          <span class="pill">影视游戏资产</span>
+          <span class="pill">影视分镜图</span>
+          <span class="pill">知识可视化</span>
+          <span class="pill">社媒营销配图</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="edit">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Pixel-precise editing</div>
+          <h2>多轮编辑一致性强，上百轮修改不崩坏</h2>
+          <p>针对误差随轮次累积的问题，Seedream 5.5 专项强化像素级保持能力。即使上百轮连续修改，指定区域之外的主体特征、构图比例、光影风格仍能完全一致——真正做到「改哪里动哪里」。</p>
+        </div>
+        <div class="feature-banner">
+          <img src="https://upload.maynor1024.live/file/1794217164860_00.png" alt="多轮编辑一致性强，上百轮修改不崩坏" />
+        </div>
+        <div class="split">
+          <article class="card">
+            <div class="card-body">
+              <h3>电商穿搭动态展示</h3>
+              <p>多轮图像编辑能以轻量化、低成本、可持续复用的视觉动态，向客户展示不同穿搭效果。</p>
+            </div>
+          </article>
+          <article class="card">
+            <div class="card-body">
+              <h3>家装方案快速验证</h3>
+              <p>在保持空间布局与细节一致的同时，快速验证不同室内装饰方案的效果。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="rgba">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Native RGBA</div>
+          <h2>生成与拆分 RGBA 透明素材，高效编排创作资产</h2>
+          <p>直接输出带 Alpha 通道的图像，最多支持 100 层透明素材分层。从生成到分层，再到编辑与组合，创作资产可稳定复用、独立编排。密集小字渲染能力同步提升，复杂字形与紧凑排版更清晰易读。</p>
+        </div>
+        <div class="feature-banner">
+          <img src="https://upload.maynor1024.live/file/1794217172669_01.png" alt="生成与拆分 RGBA 透明素材" />
+        </div>
+        <div class="card" style="margin-top:1rem;">
+          <img src="https://upload.maynor1024.live/file/1794217174096_02.png" alt="莎士比亚主题报纸版面：密集英文小字清晰易读" />
+          <div class="card-body">
+            <h3>文字渲染升级</h3>
+            <p>以莎士比亚为主题的报纸版面中，人物肖像与剧场插图之间穿插多段英文小字，排布紧凑、清晰易读——展示 Seedream 5.5 对密集小字生成与排布的提升。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="realism">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Photorealism</div>
+          <h2>图像质感更真实，场景融合更自然</h2>
+          <p>显著提升写实场景中光影、材质与皮肤纹理表现，大幅减少过度油亮、过曝，让结果更接近自然拍摄质感。</p>
+        </div>
+        <div class="feature-banner">
+          <img src="https://upload.maynor1024.live/file/1794217173822_03.png" alt="图像质感更真实，场景融合更自然" />
+        </div>
+        <div class="split" style="margin-top:1rem;">
+          <figure class="card">
+            <img src="https://upload.maynor1024.live/file/1794217177649_04.png" alt="写实人像：自然光影与皮肤纹理" />
+            <figcaption class="card-body"><h3>写实人像</h3><p>接近实拍的皮肤纹理、发丝与环境光，减少塑料感与过曝。</p></figcaption>
+          </figure>
+          <figure class="card">
+            <img src="https://upload.maynor1024.live/file/1794217181568_05.png" alt="室内夜景写实：自然光影与材质" />
+            <figcaption class="card-body"><h3>场景写实</h3><p>复杂室内光影与材质表现更自然，电影感更强。</p></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="vfx">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Film &amp; VFX</div>
+          <h2>影视光影与特效合成，更接近真实拍摄</h2>
+          <p>面对相同提示词，Seedream 5.5 能更准确还原真实逆光：正脸暗而清晰，发丝与肩部轮廓光更接近真实世界。新增元素与原场景的空间关系、光影融合也更自然——如下方火焰与手臂的衔接更符合物理逻辑，雾气层次过渡更顺滑。</p>
+        </div>
+        <div class="compare">
+          <figure>
+            <img src="https://upload.maynor1024.live/file/1794217174486_06.jpg" alt="原场景 / 基础生成" />
+            <figcaption>原场景基础效果</figcaption>
+          </figure>
+          <figure>
+            <img src="https://upload.maynor1024.live/file/1794217177276_07.png" alt="Seedream 5.5 特效合成：火焰与手臂自然衔接" />
+            <figcaption>Seedream 5.5 特效合成效果</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <div class="cta" id="cta">
+        <h2>告别碰运气的抽卡，回到可雕琢的画布</h2>
+        <p>Seedream 5.5 API 将上线火山方舟，开发者与企业可接入 Harness 与生产管线。C 端用户可在即梦、豆包中直接体验。结合豆包「应用生成」「社媒营销配图」「风格海报」等技能，二次创作更轻松。</p>
+        <div class="cta-actions">
+          <a class="btn btn-primary" href="https://www.volcengine.com/product/ark" target="_blank" rel="noopener">火山方舟 · 接入 API</a>
+          <a class="btn btn-ghost" href="https://jimeng.jianying.com/" target="_blank" rel="noopener">即梦体验</a>
+          <a class="btn btn-ghost" href="https://www.doubao.com/" target="_blank" rel="noopener">豆包体验</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <img src="https://upload.maynor1024.live/file/1794217174914_09.png" alt="关注火山引擎：视频号、抖音、今日头条、知乎全平台同名" />
+      <p>内容来源：火山引擎公众号文章《Seedream 5.5：像素级可控编辑，百轮修改不崩坏》</p>
+      <p class="source"><a href="https://mp.weixin.qq.com/s/35BineRdaBEsMi2Wvefr6Q" target="_blank" rel="noopener">查看原文</a> · Landing page by xianyu110</p>
+    </div>
+  </footer>
+</body>
+</html>
